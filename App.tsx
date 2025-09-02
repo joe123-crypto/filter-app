@@ -1,67 +1,25 @@
 
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback } from 'react';
 import { Filter, ViewState } from './types';
 import { INITIAL_FILTERS } from './constants';
 import Marketplace from './components/Marketplace';
 import ApplyFilterView from './components/ApplyFilterView';
 import CreateFilterView from './components/CreateFilterView';
 import { HeaderIcon } from './components/icons';
-import { getFilters, saveFilter } from './services/firebaseService';
-import Spinner from './components/Spinner';
 
 const App: React.FC = () => {
-  const [filters, setFilters] = useState<Filter[]>([]);
+  const [filters, setFilters] = useState<Filter[]>(INITIAL_FILTERS);
   const [viewState, setViewState] = useState<ViewState>({ view: 'marketplace' });
-  const [isLoading, setIsLoading] = useState<boolean>(true);
-  const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    const fetchFilters = async () => {
-      try {
-        setError(null);
-        setIsLoading(true);
-        const dbFilters = await getFilters();
-        
-        // Combine initial filters with database filters, ensuring no duplicates by name
-        const combinedFilters = [...dbFilters, ...INITIAL_FILTERS];
-        const uniqueFilters = Array.from(new Map(combinedFilters.map(item => [item.name, item])).values());
-
-        setFilters(uniqueFilters);
-      } catch (err) {
-        console.error(err);
-        setError("Could not load filters from the database. Displaying default filters.");
-        setFilters(INITIAL_FILTERS); // Fallback to initial filters
-      } finally {
-        setIsLoading(false);
-      }
+  const addFilter = useCallback((newFilterData: Omit<Filter, 'id'>) => {
+    const newFilter: Filter = {
+      ...newFilterData,
+      id: `local-${Date.now()}-${Math.random()}` // Create a unique local ID
     };
-
-    fetchFilters();
-  }, []);
-
-  const addFilter = useCallback(async (newFilterData: Omit<Filter, 'id'>) => {
-    const newFilter = await saveFilter(newFilterData);
     setFilters(prevFilters => [newFilter, ...prevFilters]);
   }, []);
 
   const renderView = () => {
-    if (isLoading && viewState.view === 'marketplace') {
-      return (
-        <div className="flex flex-col items-center justify-center pt-20">
-          <Spinner />
-          <p className="mt-4 text-lg">Loading Filters...</p>
-        </div>
-      );
-    }
-    
-    if (error && viewState.view === 'marketplace') {
-        return (
-            <div className="text-center pt-20 text-red-400">
-                <p>{error}</p>
-            </div>
-        )
-    }
-
     switch (viewState.view) {
       case 'marketplace':
         return <Marketplace filters={filters} setViewState={setViewState} />;

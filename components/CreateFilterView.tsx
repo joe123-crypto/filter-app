@@ -7,7 +7,7 @@ import Spinner from './Spinner';
 
 
 interface CreateFilterViewProps {
-  addFilter: (filter: Omit<Filter, 'id'>) => Promise<void>;
+  addFilter: (filter: Omit<Filter, 'id'>) => void;
   setViewState: (viewState: ViewState) => void;
 }
 
@@ -77,7 +77,7 @@ const CreateFilterView: React.FC<CreateFilterViewProps> = ({ addFilter, setViewS
 }, [prompt]);
 
 
-  const handleSubmit = async (event: React.FormEvent) => {
+  const handleSubmit = (event: React.FormEvent) => {
     event.preventDefault();
     if (!name || !description || !prompt || !previewImage) {
       setError('All fields, including a preview image, are required.');
@@ -86,25 +86,16 @@ const CreateFilterView: React.FC<CreateFilterViewProps> = ({ addFilter, setViewS
 
     setIsSaving(true);
     setError('');
+    
+    const newFilterData = {
+        name,
+        description,
+        prompt,
+        previewImageUrl: previewImage,
+    };
 
-    try {
-        const newFilterData = {
-            name,
-            description,
-            prompt,
-            previewImageUrl: previewImage,
-        };
-
-        await addFilter(newFilterData);
-        setViewState({ view: 'marketplace' });
-    } catch (err) {
-        if (err instanceof Error) {
-            setError(err.message);
-        } else {
-            setError('An unknown error occurred while saving the filter.');
-        }
-        setIsSaving(false); // Only set to false on error, success navigates away
-    }
+    addFilter(newFilterData);
+    setViewState({ view: 'marketplace' });
   };
 
   const isBusy = isGenerating || isImprovingPrompt || isSaving;
