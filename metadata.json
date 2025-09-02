@@ -1,0 +1,5 @@
+{
+  "name": "Gemini Filter Fusion",
+  "description": "An image filter sharing app prototype powered by Gemini. Users can browse a library of AI-powered filters, apply them to their own photos, and create and share new filters with the community using natural language prompts.",
+  "requestFramePermissions": []
+}
