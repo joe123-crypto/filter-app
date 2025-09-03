@@ -1,7 +1,7 @@
 import { parseDataUrl } from '../utils/fileUtils';
 
 // The API key MUST be available in the environment variables.
-const API_KEY = process.env.API_KEY;
+const API_KEY = "vck_2gM9BKyUYcXulwnXE9mmn0PcPseDUu9bkl6a0fUaWogOrqvl1l2WHN0q"//process.env.API_KEY;
 
 if (!API_KEY) {
   throw new Error("API_KEY environment variable not set. This is required for the application to function.");
