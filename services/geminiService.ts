@@ -1,4 +1,4 @@
-import { GoogleGenAI, Modality } from "@google/genai";
+import { GoogleGenAI, Modality, Type } from "@google/genai";
 import { parseDataUrl } from '../utils/fileUtils';
 
 // The API key MUST be available in the environment variables.
@@ -11,25 +11,23 @@ if (!API_KEY) {
 const ai = new GoogleGenAI({ apiKey: API_KEY });
 
 export const applyImageFilter = async (base64ImageDataUrl: string, prompt: string): Promise<string> => {
-  const parsedData = parseDataUrl(base64ImageDataUrl);
-  if (!parsedData) {
-    throw new Error("Invalid image data format.");
+  const parsedUserData = parseDataUrl(base64ImageDataUrl);
+  if (!parsedUserData) {
+    throw new Error("Invalid user image data format.");
   }
-
-  const { mimeType, data } = parsedData;
 
   try {
     const response = await ai.models.generateContent({
       model: 'gemini-2.5-flash-image-preview',
       contents: {
         parts: [
-          {
+          { // User's image
             inlineData: {
-              data: data,
-              mimeType: mimeType,
+              data: parsedUserData.data,
+              mimeType: parsedUserData.mimeType,
             },
           },
-          {
+          { // Instructions
             text: prompt,
           },
         ],
@@ -67,7 +65,8 @@ export const applyImageFilter = async (base64ImageDataUrl: string, prompt: strin
 
 
 export const generatePreviewImage = async (description: string): Promise<string> => {
-  const prompt = `A high-quality, visually appealing, vibrant photograph that could be used as a sample image for a photo filter called "${description}". The image should be interesting and showcase a clear subject. Aspect ratio 1:1.`;
+  // Simplified prompt to be more direct and robust, reducing the chance of internal API errors.
+  const prompt = `A sample photograph for a photo filter named "${description}". High quality, vibrant, clear subject, 1:1 aspect ratio.`;
 
   try {
     const response = await ai.models.generateImages({
@@ -128,5 +127,146 @@ Only return the improved prompt text itself.`;
         throw new Error(`Failed to improve prompt: ${error.message}`);
     }
     throw new Error("An unknown error occurred while improving the prompt.");
+  }
+};
+
+export const generateFullFilter = async (theme: string): Promise<{ name: string, description: string, prompt: string, previewImageUrl: string }> => {
+  const systemInstruction = `You are a creative assistant for a photo filter app. Your task is to invent a new photo filter based on a theme.
+You must generate a short, catchy name for the filter, a brief one-sentence description, and a detailed image generation prompt that would be used to apply the filter.
+Respond with only a JSON object.`;
+  
+  const contents = `The theme for the new filter is: "${theme}"`;
+  
+  const responseSchema = {
+    type: Type.OBJECT,
+    properties: {
+      name: { type: Type.STRING, description: "A short, catchy name for the filter (e.g., 'Retro VHS Glow')." },
+      description: { type: Type.STRING, description: "A brief, one-sentence description of the filter's effect." },
+      prompt: { type: Type.STRING, description: "A detailed prompt for an AI to apply the filter's visual style to an image." },
+    },
+    required: ["name", "description", "prompt"],
+  };
+
+  try {
+    const textResponse = await ai.models.generateContent({
+      model: 'gemini-2.5-flash',
+      contents: contents,
+      config: {
+        systemInstruction,
+        responseMimeType: "application/json",
+        responseSchema,
+      },
+    });
+
+    const jsonText = textResponse.text.trim();
+    if (!jsonText) {
+      throw new Error("The AI returned an empty response for the filter details.");
+    }
+
+    const { name, description, prompt } = JSON.parse(jsonText);
+
+    if (!name || !description || !prompt) {
+      throw new Error("The AI response was missing required fields (name, description, or prompt).");
+    }
+
+    const previewImageUrl = await generatePreviewImage(description);
+
+    return { name, description, prompt, previewImageUrl };
+
+  } catch (error) {
+    console.error("Error generating full filter with AI:", error);
+    if (error instanceof Error) {
+      throw new Error(`Failed to generate AI filter: ${error.message}`);
+    }
+    throw new Error("An unknown error occurred while generating the filter with AI.");
+  }
+};
+
+export const categorizeFilter = async (name: string, description: string, prompt: string): Promise<'Useful' | 'Fun'> => {
+  const systemInstruction = `You are an expert filter classifier for a photo app. Your task is to categorize a user-created filter as either 'Useful' or 'Fun'.
+  'Useful' filters are for general photo improvements like color correction, lighting adjustments, sharpening, or subtle enhancements.
+  'Fun' filters apply creative, artistic, unusual, or dramatic effects, like turning a photo into a cartoon, a painting, or applying a heavy stylistic theme.
+  Respond with ONLY the word 'Useful' or 'Fun'. Do not add any other text, explanation, or punctuation.`;
+  
+  const contents = `Filter Name: "${name}"\nFilter Description: "${description}"\nAI Prompt: "${prompt}"`;
+
+  try {
+    const response = await ai.models.generateContent({
+      model: 'gemini-2.5-flash',
+      contents: contents,
+      config: {
+        systemInstruction: systemInstruction,
+        temperature: 0, // Make it deterministic
+      },
+    });
+
+    const category = response.text?.trim();
+
+    if (category === 'Useful' || category === 'Fun') {
+      return category;
+    }
+
+    console.warn(`AI returned an unexpected category: '${category}'. Defaulting to 'Useful'.`);
+    return 'Useful'; // Fallback in case of unexpected response
+
+  } catch (error) {
+    console.error("Error calling Gemini API for filter categorization:", error);
+    // Fallback to a default category on error
+    return 'Useful';
+  }
+};
+
+export const generateTrendingFilter = async (): Promise<{ name: string, description: string, prompt: string, previewImageUrl: string }> => {
+  const systemInstruction = `You are a creative director and trend analyst for a popular photo filter app. 
+Your job is to design one new, exciting photo filter each day based on current visual trends seen on social media (like Instagram and TikTok) and in modern photography.
+You must respond with only a JSON object.`;
+  
+  const contents = `Invent today's trending filter. It should have a short, catchy name, a one-sentence description of its effect, and a detailed image generation prompt that an AI can use to apply the filter's style to a photo. Make the style feel fresh, modern, and popular right now.`;
+  
+  const responseSchema = {
+    type: Type.OBJECT,
+    properties: {
+      name: { type: Type.STRING, description: "A short, catchy name for the filter (e.g., 'Cottagecore Bloom', 'Y2K Glitch')." },
+      description: { type: Type.STRING, description: "A brief, one-sentence description of the filter's effect." },
+      prompt: { type: Type.STRING, description: "A detailed prompt for an AI to apply the filter's visual style to an image." },
+    },
+    required: ["name", "description", "prompt"],
+  };
+
+  try {
+    const textResponse = await ai.models.generateContent({
+      model: 'gemini-2.5-flash',
+      contents: contents,
+      config: {
+        systemInstruction,
+        responseMimeType: "application/json",
+        responseSchema,
+      },
+    });
+
+    const jsonText = textResponse.text.trim();
+    if (!jsonText) {
+      throw new Error("The AI returned an empty response for the filter details.");
+    }
+
+    const { name, description, prompt } = JSON.parse(jsonText);
+
+    if (!name || !description || !prompt) {
+      throw new Error("The AI response was missing required fields (name, description, or prompt).");
+    }
+
+    // Add a marker to the description
+    const trendDescription = `${description} (AI Trend of the Day)`;
+
+    const previewImageUrl = await generatePreviewImage(description);
+
+    return { name, description: trendDescription, prompt, previewImageUrl };
+
+  } catch (error) {
+    console.error("Error generating trending filter with AI:", error);
+    if (error instanceof Error) {
+      throw new Error(`Failed to generate trending filter: ${error.message}`);
+    }
+    throw new Error("An unknown error occurred while generating the trending filter.");
   }
 };
