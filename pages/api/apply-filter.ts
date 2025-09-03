@@ -1,27 +1,23 @@
-// app/api/apply-filter/route.ts  (Next.js App Router style)
-// Or /api/apply-filter.ts for a plain Vercel function
+﻿import { VercelRequest, VercelResponse } from '@vercel/node';
 
-export const runtime = "edge"; // use "nodejs" if you need Node features
+export default async function handler(req: VercelRequest, res: VercelResponse) {
+  // Only allow POST requests
+  if (req.method !== 'POST') {
+    return res.status(405).json({ error: 'Method not allowed' });
+  }
 
-export async function POST(req: Request) {
   try {
-    const { prompt, image } = await req.json(); // image: base64 string
+    const { prompt, image } = req.body; // image: base64 string
 
     if (!prompt || !image) {
-      return Response.json(
-        { error: "Missing prompt or image" },
-        { status: 400 }
-      );
+      return res.status(400).json({ error: "Missing prompt or image" });
     }
 
     const gatewayUrl = process.env.VERCEL_AI_GATEWAY_URL;
     const apiKey = process.env.GOOGLE_API_KEY;
 
     if (!gatewayUrl || !apiKey) {
-      return Response.json(
-        { error: "Missing environment variables" },
-        { status: 500 }
-      );
+      return res.status(500).json({ error: "Missing environment variables" });
     }
 
     // Call Vercel AI Gateway (Gemini 2.5 Pro)
@@ -44,7 +40,7 @@ export async function POST(req: Request) {
 
     if (!response.ok) {
       const text = await response.text();
-      return Response.json({ error: text }, { status: response.status });
+      return res.status(response.status).json({ error: text });
     }
 
     const data = await response.json();
@@ -55,18 +51,15 @@ export async function POST(req: Request) {
     );
 
     if (!imagePart) {
-      return Response.json(
-        { error: "No image returned from AI Gateway" },
-        { status: 500 }
-      );
+      return res.status(500).json({ error: "No image returned from AI Gateway" });
     }
 
     const base64Image = imagePart.inlineData.data;
     const mimeType = imagePart.inlineData.mimeType || "image/png";
 
-    return Response.json({ imageUrl: `data:${mimeType};base64,${base64Image}` });
+    return res.json({ imageUrl: `data:${mimeType};base64,${base64Image}` });
   } catch (err: any) {
     console.error("apply-filter error:", err);
-    return Response.json({ error: "Internal Server Error" }, { status: 500 });
+    return res.status(500).json({ error: "Internal Server Error" });
   }
 }

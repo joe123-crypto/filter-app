@@ -1,17 +1,21 @@
-// api/generate-full-filter.ts
-export const runtime = 'edge';
+﻿import { VercelRequest, VercelResponse } from '@vercel/node';
 
-const VEREL_API_KEY = process.env.VERCEL_AI_KEY;
-if (!VEREL_API_KEY) {
-  throw new Error('VERCEL_AI_KEY environment variable is missing');
-}
+export default async function handler(req: VercelRequest, res: VercelResponse) {
+  // Only allow POST requests
+  if (req.method !== 'POST') {
+    return res.status(405).json({ error: 'Method not allowed' });
+  }
 
-export async function POST(req: Request) {
   try {
-    const { theme } = await req.json();
+    const { theme } = req.body;
 
     if (!theme) {
-      return Response.json({ error: 'theme is required' }, { status: 400 });
+      return res.status(400).json({ error: 'theme is required' });
+    }
+
+    const VERCEL_API_KEY = process.env.VERCEL_AI_KEY;
+    if (!VERCEL_API_KEY) {
+      return res.status(500).json({ error: 'VERCEL_AI_KEY environment variable is missing' });
     }
 
     // 1. Generate text details (name, description, prompt) via Vercel AI Gateway
@@ -40,7 +44,7 @@ Respond with a JSON object containing:
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${VEREL_API_KEY}`,
+          'Authorization': `Bearer ${VERCEL_API_KEY}`,
         },
         body: JSON.stringify(textPayload),
       }
@@ -48,7 +52,7 @@ Respond with a JSON object containing:
 
     if (!textRes.ok) {
       const errorText = await textRes.text();
-      return Response.json({ error: `Text generation failed: ${errorText}` }, { status: 500 });
+      return res.status(500).json({ error: `Text generation failed: ${errorText}` });
     }
 
     const textData = await textRes.json();
@@ -56,7 +60,7 @@ Respond with a JSON object containing:
     try {
       filterDetails = JSON.parse(textData?.output?.[0]?.text);
     } catch (err) {
-      return Response.json({ error: 'Failed to parse AI response as JSON' }, { status: 500 });
+      return res.status(500).json({ error: 'Failed to parse AI response as JSON' });
     }
 
     // 2. Generate a preview image via Vercel AI Gateway
@@ -79,7 +83,7 @@ Respond with a JSON object containing:
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${VEREL_API_KEY}`,
+          'Authorization': `Bearer ${VERCEL_API_KEY}`,
         },
         body: JSON.stringify(imagePayload),
       }
@@ -87,7 +91,7 @@ Respond with a JSON object containing:
 
     if (!imageRes.ok) {
       const errorText = await imageRes.text();
-      return Response.json({ error: `Image generation failed: ${errorText}` }, { status: 500 });
+      return res.status(500).json({ error: `Image generation failed: ${errorText}` });
     }
 
     const imageData = await imageRes.json();
@@ -100,10 +104,10 @@ Respond with a JSON object containing:
       previewImageUrl,
     };
 
-    return Response.json(fullFilter);
+    return res.json(fullFilter);
 
   } catch (error: any) {
     console.error('Error generating full filter:', error);
-    return Response.json({ error: error.message || 'Failed to generate full filter' }, { status: 500 });
+    return res.status(500).json({ error: error.message || 'Failed to generate full filter' });
   }
 }

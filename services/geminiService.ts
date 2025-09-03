@@ -34,7 +34,7 @@ const fetchApi = async (endpoint: string, body: object) => {
  */
 export const applyImageFilter = async (base64ImageDataUrl: string, prompt: string): Promise<string> => {
   const base64Image = base64ImageDataUrl.replace(/^data:image\/\w+;base64,/, '');
-  const { imageUrl } = await fetchApi('https://filter-app-teal.vercel.app/api/apply-filter', { prompt, image: base64Image });
+  const { imageUrl } = await fetchApi('/api/apply-filter', { prompt, image: base64Image });
   return imageUrl;
 };
 
@@ -42,7 +42,7 @@ export const applyImageFilter = async (base64ImageDataUrl: string, prompt: strin
  * Generate a preview image for a description.
  */
 export const generatePreviewImage = async (description: string): Promise<string> => {
-  const { imageUrl } = await fetchApi('https://filter-app-teal.vercel.app/api/generate-preview', { description });
+  const { imageUrl } = await fetchApi('/api/generate-preview', { description });
   return imageUrl;
 };
 
@@ -50,7 +50,7 @@ export const generatePreviewImage = async (description: string): Promise<string>
  * Improve a user's text prompt.
  */
 export const improvePrompt = async (currentPrompt: string): Promise<string> => {
-  const { improvedPrompt } = await fetchApi('https://filter-app-teal.vercel.app/api/improve-prompt', { currentPrompt });
+  const { improvedPrompt } = await fetchApi('/api/improve-prompt', { currentPrompt });
   return improvedPrompt;
 };
 
@@ -58,7 +58,7 @@ export const improvePrompt = async (currentPrompt: string): Promise<string> => {
  * Generate a full filter object including preview image.
  */
 export const generateFullFilter = async (theme: string): Promise<{ name: string, description: string, prompt: string, previewImageUrl: string }> => {
-  const result = await fetchApi('https://filter-app-teal.vercel.app/api/generate-full-filter', { theme });
+  const result = await fetchApi('/api/generate-full-filter', { theme });
   return result;
 };
 
@@ -66,7 +66,7 @@ export const generateFullFilter = async (theme: string): Promise<{ name: string,
  * Categorize a filter as 'Useful' or 'Fun'.
  */
 export const categorizeFilter = async (name: string, description: string, prompt: string): Promise<'Useful' | 'Fun'> => {
-  const { category } = await fetchApi('https://filter-app-teal.vercel.app/api/categorize-filters', { name, description, prompt });
+  const { category } = await fetchApi('/api/categorize-filters', { name, description, prompt });
   return category === 'Useful' || category === 'Fun' ? category : 'Useful';
 };
 
@@ -74,6 +74,6 @@ export const categorizeFilter = async (name: string, description: string, prompt
  * Generate a trending filter object including preview image.
  */
 export const generateTrendingFilter = async (): Promise<{ name: string, description: string, prompt: string, previewImageUrl: string }> => {
-  const result = await fetchApi('https://filter-app-teal.vercel.app/api/generate-trending-filters', {});
+  const result = await fetchApi('/api/generate-trending-filters', {});
   return result;
 };

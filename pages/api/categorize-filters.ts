@@ -1,21 +1,21 @@
-// api/categorize-filters.ts
-export const runtime = 'edge';
+﻿import { VercelRequest, VercelResponse } from '@vercel/node';
 
-// Make sure you have VERCEL_AI_KEY set in your Vercel environment variables
-const VEREL_API_KEY = process.env.VERCEL_AI_KEY;
-if (!VEREL_API_KEY) {
-  throw new Error('VERCEL_AI_KEY environment variable is missing');
-}
+export default async function handler(req: VercelRequest, res: VercelResponse) {
+  // Only allow POST requests
+  if (req.method !== 'POST') {
+    return res.status(405).json({ error: 'Method not allowed' });
+  }
 
-export async function POST(req: Request) {
   try {
-    const { name, description, prompt } = await req.json();
+    const { name, description, prompt } = req.body;
 
     if (!name || !description || !prompt) {
-      return Response.json(
-        { error: 'name, description, and prompt are required' },
-        { status: 400 }
-      );
+      return res.status(400).json({ error: 'name, description, and prompt are required' });
+    }
+
+    const VERCEL_API_KEY = process.env.VERCEL_AI_KEY;
+    if (!VERCEL_API_KEY) {
+      return res.status(500).json({ error: 'VERCEL_AI_KEY environment variable is missing' });
     }
 
     const payload = {
@@ -43,7 +43,7 @@ Based on this, is the filter primarily 'Useful' or 'Fun'?`
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${VEREL_API_KEY}`,
+          'Authorization': `Bearer ${VERCEL_API_KEY}`,
         },
         body: JSON.stringify(payload),
       }
@@ -51,23 +51,20 @@ Based on this, is the filter primarily 'Useful' or 'Fun'?`
 
     if (!response.ok) {
       const errorText = await response.text();
-      return Response.json(
-        { error: `Vercel AI Gateway error: ${errorText}` },
-        { status: 500 }
-      );
+      return res.status(500).json({ error: `Vercel AI Gateway error: ${errorText}` });
     }
 
     const data = await response.json();
     const categoryText = data?.output?.[0]?.text?.trim();
 
     if (categoryText === 'Useful' || categoryText === 'Fun') {
-      return Response.json({ category: categoryText });
+      return res.json({ category: categoryText });
     }
 
     // fallback if unexpected response
-    return Response.json({ category: 'Useful' });
+    return res.json({ category: 'Useful' });
   } catch (error: any) {
     console.error('Error in categorize-filters:', error);
-    return Response.json({ error: error.message || 'Server error' }, { status: 500 });
+    return res.status(500).json({ error: error.message || 'Server error' });
   }
 }
