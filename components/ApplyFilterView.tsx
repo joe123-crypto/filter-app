@@ -1,19 +1,24 @@
+
 import React, { useState, useCallback } from 'react';
-import { Filter, ViewState } from '../types';
+import { Filter, ViewState, User } from '../types';
 import { applyImageFilter } from '../services/geminiService';
 import { fileToBase64 } from '../utils/fileUtils';
+import { shareImage } from '../services/shareService';
 import Spinner from './Spinner';
-import { BackArrowIcon, UploadIcon, SparklesIcon, DownloadIcon } from './icons';
+import { BackArrowIcon, UploadIcon, SparklesIcon, ShareIcon } from './icons';
 
 interface ApplyFilterViewProps {
   filter: Filter;
   setViewState: (viewState: ViewState) => void;
+  user: User | null;
 }
 
-const ApplyFilterView: React.FC<ApplyFilterViewProps> = ({ filter, setViewState }) => {
+const ApplyFilterView: React.FC<ApplyFilterViewProps> = ({ filter, setViewState, user }) => {
   const [uploadedImage, setUploadedImage] = useState<string | null>(null);
   const [generatedImage, setGeneratedImage] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [isSharing, setIsSharing] = useState<boolean>(false);
+  const [shareStatus, setShareStatus] = useState<'idle' | 'copied' | 'error'>('idle');
   const [error, setError] = useState<string | null>(null);
 
   const handleImageUpload = useCallback(async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -51,6 +56,32 @@ const ApplyFilterView: React.FC<ApplyFilterViewProps> = ({ filter, setViewState 
       setIsLoading(false);
     }
   }, [uploadedImage, filter.prompt]);
+
+  const handleShare = async () => {
+    if (!generatedImage) return;
+
+    setIsSharing(true);
+    setShareStatus('idle');
+    setError(null);
+
+    try {
+        const result = await shareImage(generatedImage, filter, user);
+        if (result === 'copied') {
+            setShareStatus('copied');
+            setTimeout(() => setShareStatus('idle'), 2000); // Reset after 2 seconds
+        }
+    } catch (err) {
+        if (err instanceof Error) {
+            setError(`Sharing failed: ${err.message}`);
+        } else {
+            setError('An unknown error occurred while sharing.');
+        }
+        setShareStatus('error');
+    } finally {
+        setIsSharing(false);
+    }
+  };
+
 
   const displayImage = generatedImage || uploadedImage;
 
@@ -108,16 +139,14 @@ const ApplyFilterView: React.FC<ApplyFilterViewProps> = ({ filter, setViewState 
               </button>
               
               {generatedImage && (
-                <div className="flex flex-col gap-4">
-                  <a
-                    href={generatedImage}
-                    download={`filtered-${filter.name.toLowerCase().replace(/\s/g, '-')}.png`}
-                    className="w-full flex items-center justify-center gap-2 bg-gray-600 hover:bg-gray-700 text-white font-bold py-3 px-4 rounded-lg transition-colors"
-                  >
-                    <DownloadIcon />
-                    Download
-                  </a>
-                </div>
+                <button
+                  onClick={handleShare}
+                  disabled={isSharing}
+                  className="w-full flex items-center justify-center gap-2 bg-gray-600 hover:bg-gray-700 text-white font-bold py-3 px-4 rounded-lg transition-colors disabled:opacity-50"
+                >
+                  <ShareIcon />
+                   {isSharing ? 'Sharing...' : shareStatus === 'copied' ? 'Link Copied!' : 'Share'}
+                </button>
               )}
             </div>
           </div>

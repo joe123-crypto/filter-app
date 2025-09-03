@@ -5,6 +5,7 @@ import Marketplace from './components/Marketplace';
 import ApplyFilterView from './components/ApplyFilterView';
 import CreateFilterView from './components/CreateFilterView';
 import AuthView from './components/AuthView';
+import SharedImageView from './components/SharedImageView';
 import { HeaderIcon } from './components/icons';
 import { getFilters } from './services/firebaseService';
 import { checkAndGenerateDailyTrend } from './services/dailyTrendService';
@@ -25,7 +26,19 @@ const App: React.FC = () => {
       setUser(currentUser);
     }
     
-    // 2. Load app data
+    // 2. Check for a share link in the URL
+    const urlParams = new URLSearchParams(window.location.search);
+    const shareId = urlParams.get('share');
+
+    if (shareId) {
+      setViewState({ view: 'shared', shareId });
+      setIsLoading(false);
+      // Remove the query parameter from the URL for a cleaner look
+      window.history.replaceState({}, document.title, window.location.pathname);
+      return; // Skip normal app initialization
+    }
+
+    // 3. Load app data
     const initializeApp = async () => {
       try {
         setError(null);
@@ -89,7 +102,7 @@ const App: React.FC = () => {
       return (
         <div className="flex flex-col items-center justify-center h-64">
           <Spinner />
-          <p className="mt-4 text-lg text-content-200">Loading filters...</p>
+          <p className="mt-4 text-lg text-content-200">Loading...</p>
         </div>
       );
     }
@@ -108,11 +121,13 @@ const App: React.FC = () => {
       case 'marketplace':
         return <Marketplace filters={filters} setViewState={setViewState} onCreateFilterClick={handleCreateFilterClick} />;
       case 'apply':
-        return <ApplyFilterView filter={viewState.filter} setViewState={setViewState} />;
+        return <ApplyFilterView filter={viewState.filter} setViewState={setViewState} user={user} />;
       case 'create':
         return <CreateFilterView addFilter={addFilter} setViewState={setViewState} user={user} />;
       case 'auth':
         return <AuthView onSignInSuccess={handleSignInSuccess} setViewState={setViewState}/>;
+      case 'shared':
+        return <SharedImageView shareId={viewState.shareId} setViewState={setViewState} />;
       default:
         return <Marketplace filters={filters} setViewState={setViewState} onCreateFilterClick={handleCreateFilterClick} />;
     }

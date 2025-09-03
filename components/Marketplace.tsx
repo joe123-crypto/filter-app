@@ -1,5 +1,5 @@
 
-import React from 'react';
+import React, { useMemo } from 'react';
 import { Filter, ViewState } from '../types';
 import FilterCard from './FilterCard';
 import { PlusIcon } from './icons';
@@ -10,10 +10,30 @@ interface MarketplaceProps {
   onCreateFilterClick: () => void;
 }
 
-const CATEGORIES = ['AI Generated', 'Useful', 'Fun'];
 const ASPECT_RATIOS = ['aspect-square', 'aspect-[3/4]', 'aspect-[4/3]'];
 
 const Marketplace: React.FC<MarketplaceProps> = ({ filters, setViewState, onCreateFilterClick }) => {
+  const categories = useMemo(() => {
+    // A preferred order for known categories for consistent display
+    const preferredOrder = ['Trending', 'AI Generated', 'Useful', 'Fun'];
+    
+    // Get all unique categories from the filters
+    const allCategories = [...new Set(filters.map(f => f.category))];
+    
+    // Sort the categories based on the preferred order, with unknown categories appearing at the end
+    allCategories.sort((a, b) => {
+      const indexA = preferredOrder.indexOf(a);
+      const indexB = preferredOrder.indexOf(b);
+      
+      if (indexA === -1 && indexB === -1) return a.localeCompare(b); // Both unknown, sort alphabetically
+      if (indexA === -1) return 1; // `a` is unknown, so it comes after `b`
+      if (indexB === -1) return -1; // `b` is unknown, so it comes after `a`
+      return indexA - indexB; // Both are known, sort by preferred order
+    });
+
+    return allCategories;
+  }, [filters]);
+
   return (
     <div className="animate-fade-in">
       <div className="flex flex-col sm:flex-row justify-between items-center mb-6 gap-4">
@@ -43,7 +63,7 @@ const Marketplace: React.FC<MarketplaceProps> = ({ filters, setViewState, onCrea
       )}
 
       <div className="space-y-10">
-        {CATEGORIES.map(category => {
+        {categories.map(category => {
           const categoryFilters = filters.filter(f => f.category === category);
           if (categoryFilters.length === 0) {
             return null;
