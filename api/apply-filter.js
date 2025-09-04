@@ -30,7 +30,7 @@ export default async function handler(req, res) {
     })();
 
     const result = streamText({
-      model: 'google/gemini-2.5-pro-preview',
+      model: 'google/gemini-2.5-flash-image-preview',
       providerOptions: {
         google: { responseModalities: ['IMAGE'] },
       },
