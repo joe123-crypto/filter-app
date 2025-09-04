@@ -13,13 +13,6 @@ export default async function handler(req, res) {
     }
 
     const { streamText } = await import('ai');
-    const { createGoogleGenerativeAI } = await import('@ai-sdk/google');
-
-    // Use Vercel AI Gateway by setting baseURL and API key
-    const google = createGoogleGenerativeAI({
-      baseURL: 'https://ai-gateway.vercel.sh/v1',
-      apiKey: process.env.AI_GATEWAY_API_KEY,
-    });
 
     // Auto-detect and normalize input image
     const { bytes: inputBytes, mimeType } = (() => {
@@ -35,9 +28,9 @@ export default async function handler(req, res) {
     })();
 
     const result = streamText({
-      model: google('google/gemini-2.5-flash-image-preview'),
+      model: 'google/gemini-2.5-flash-image-preview',
       providerOptions: {
-        google: { responseModalities: ['IMAGE'] },
+        google: { responseModalities: ['TEXT', 'IMAGE'] },
       },
       messages: [
         {

@@ -13,17 +13,11 @@ export default async function handler(req, res) {
     }
 
     const { streamText } = await import('ai');
-    const { createGoogleGenerativeAI } = await import('@ai-sdk/google');
-
-    const google = createGoogleGenerativeAI({
-      baseURL: 'https://ai-gateway.vercel.sh/v1',
-      apiKey: process.env.AI_GATEWAY_API_KEY,
-    });
 
     const result = streamText({
-      model: google('google/gemini-2.5-flash-image-preview'),
+      model: 'google/gemini-2.5-flash-image-preview',
       providerOptions: {
-        google: { responseModalities: ['IMAGE'] },
+        google: { responseModalities: ['TEXT', 'IMAGE'] },
       },
       messages: [
         {
