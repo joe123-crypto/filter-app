@@ -4,7 +4,9 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "vite",
+    "dev:client": "vite",
+    "dev:api": "node dev-server.js",
+    "dev": "concurrently \"npm:dev:api\" \"npm:dev:client\"",
     "build": "vite build",
     "preview": "vite preview"
   },
@@ -12,6 +14,8 @@
     "@ai-sdk/google": "^0.0.26",
     "@vercel/node": "^5.3.20",
     "ai": "^3.2.37",
+    "express": "^4.19.2",
+    "body-parser": "^1.20.2",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "zod": "^3.23.8"
@@ -21,6 +25,7 @@
     "@types/react": "^18.3.3",
     "@types/react-dom": "^18.3.2",
     "@vitejs/plugin-react": "^4.7.0",
+    "concurrently": "^8.2.2",
     "typescript": "^5.5.3",
     "vite": "^5.3.4"
   }
