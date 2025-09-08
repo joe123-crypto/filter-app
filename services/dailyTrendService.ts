@@ -1,3 +1,4 @@
+
 import { Filter } from '../types';
 import { generateTrendingFilter } from './geminiService';
 import { saveFilter } from './firebaseService';
@@ -18,25 +19,25 @@ export const checkAndGenerateDailyTrend = async (): Promise<Filter | null> => {
         return null;
     }
 
-    console.log("Generating new daily trend filter...");
+    console.log("Generating new daily AI filter...");
 
     try {
         const generatedData = await generateTrendingFilter();
 
         const newFilterData = {
             ...generatedData,
-            category: 'Trending', // Always place in the 'Trending' category
+            category: 'AI Generated', // Always place in the 'AI Generated' category
         };
 
         const savedFilter = await saveFilter(newFilterData);
 
         // If successful, update the local storage to prevent re-generation today
         localStorage.setItem(LAST_TREND_CHECK_KEY, today);
-        console.log("Successfully generated and saved daily trend filter:", savedFilter.name);
+        console.log("Successfully generated and saved daily AI filter:", savedFilter.name);
 
         return savedFilter;
     } catch (error) {
-        console.error("Failed to generate or save the daily trend filter:", error);
+        console.error("Failed to generate or save the daily AI filter:", error);
         // We re-throw the error so the calling function can be aware of the failure.
         throw error;
     }

@@ -1,88 +1,120 @@
 
 import React, { useMemo } from 'react';
-import { Filter, ViewState } from '../types';
+import { Filter, ViewState, User } from '../types';
 import FilterCard from './FilterCard';
 import { PlusIcon } from './icons';
 
 interface MarketplaceProps {
   filters: Filter[];
-  setViewState: (viewState: ViewState) => void;
-  onCreateFilterClick: () => void;
+  onSelectFilter: (filter: Filter) => void;
+  user: User | null;
+  onDeleteFilter: (filterId: string) => Promise<void>;
+  onEditFilter: (filter: Filter) => void;
 }
 
 const ASPECT_RATIOS = ['aspect-square', 'aspect-[3/4]', 'aspect-[4/3]'];
 
-const Marketplace: React.FC<MarketplaceProps> = ({ filters, setViewState, onCreateFilterClick }) => {
-  const categories = useMemo(() => {
-    // A preferred order for known categories for consistent display
-    const preferredOrder = ['Trending', 'AI Generated', 'Useful', 'Fun'];
+const Marketplace: React.FC<MarketplaceProps> = ({ filters, onSelectFilter, user, onDeleteFilter, onEditFilter }) => {
+
+  const { trendingSection, otherSections } = useMemo(() => {
+    // Sort by access count, descending. Filters without a count are last.
+    const sortedFilters = [...filters].sort((a, b) => (b.accessCount || 0) - (a.accessCount || 0));
+
+    // Get top 5 filters, but only if they have been accessed at least once.
+    const trendingFilters = sortedFilters.slice(0, 5).filter(f => (f.accessCount || 0) > 0);
+    const trendingIds = new Set(trendingFilters.map(f => f.id));
+
+    // All other filters are not trending.
+    const otherFilters = filters.filter(f => !trendingIds.has(f.id));
     
-    // Get all unique categories from the filters
-    const allCategories = [...new Set(filters.map(f => f.category))];
+    // Group other filters by their category.
+    const categoriesMap = new Map<string, Filter[]>();
+    otherFilters.forEach(filter => {
+        let category = filter.category;
+        // If a filter has the legacy "Trending" category but isn't popular enough
+        // to be in the main trending section, re-categorize it to avoid confusion.
+        if (category === 'Trending') {
+            category = 'AI Generated';
+        }
+
+        if (!categoriesMap.has(category)) {
+            categoriesMap.set(category, []);
+        }
+        categoriesMap.get(category)!.push(filter);
+    });
     
-    // Sort the categories based on the preferred order, with unknown categories appearing at the end
-    allCategories.sort((a, b) => {
-      const indexA = preferredOrder.indexOf(a);
-      const indexB = preferredOrder.indexOf(b);
-      
-      if (indexA === -1 && indexB === -1) return a.localeCompare(b); // Both unknown, sort alphabetically
-      if (indexA === -1) return 1; // `a` is unknown, so it comes after `b`
-      if (indexB === -1) return -1; // `b` is unknown, so it comes after `a`
-      return indexA - indexB; // Both are known, sort by preferred order
+    // Sort categories for consistent display order.
+    const preferredOrder = ['AI Generated', 'Useful', 'Fun'];
+    const sortedCategoryNames = Array.from(categoriesMap.keys()).sort((a, b) => {
+        const indexA = preferredOrder.indexOf(a);
+        const indexB = preferredOrder.indexOf(b);
+        if (indexA === -1 && indexB === -1) return a.localeCompare(b);
+        if (indexA === -1) return 1;
+        if (indexB === -1) return -1;
+        return indexA - indexB;
     });
 
-    return allCategories;
+    const otherSections = sortedCategoryNames.map(categoryName => ({
+        name: categoryName,
+        filters: categoriesMap.get(categoryName) || [],
+    }));
+
+    return { trendingSection: { name: 'Trending', filters: trendingFilters }, otherSections };
   }, [filters]);
+
 
   return (
     <div className="animate-fade-in">
       <div className="flex flex-col sm:flex-row justify-between items-center mb-6 gap-4">
-        <h2 className="text-2xl sm:text-3xl font-bold text-white text-center sm:text-left">Filter Marketplace</h2>
-        <button
-          onClick={onCreateFilterClick}
-          className="flex items-center gap-2 bg-brand-primary hover:bg-brand-secondary text-white font-bold py-2 px-4 rounded-lg transition-transform transform hover:scale-105 shadow-lg w-full sm:w-auto justify-center"
-        >
-          <PlusIcon />
-          <span className="hidden sm:inline">Create New Filter</span>
-          <span className="sm:hidden">Create Filter</span>
-        </button>
+        <h2 className="text-2xl sm:text-3xl font-bold text-content-100 dark:text-dark-content-100 text-center sm:text-left">Filter Marketplace</h2>
       </div>
 
       {filters.length === 0 && (
-         <div className="text-center bg-base-200 p-8 rounded-lg">
-            <h3 className="text-2xl font-bold text-white">The Marketplace is Empty!</h3>
-            <p className="text-content-200 mt-2 mb-4">Be the first to create and share a new filter with the community.</p>
-            <button
-                onClick={onCreateFilterClick}
-                className="flex items-center justify-center gap-2 bg-brand-primary hover:bg-brand-secondary text-white font-bold py-2 px-4 rounded-lg transition-transform transform hover:scale-105 shadow-lg mx-auto"
-            >
-                <PlusIcon />
-                <span>Create a Filter</span>
-            </button>
+         <div className="text-center bg-base-200 dark:bg-dark-base-200 p-8 rounded-lg">
+            <h3 className="text-2xl font-bold text-content-100 dark:text-dark-content-100">The Marketplace is Empty!</h3>
+            <p className="text-content-200 dark:text-dark-content-200 mt-2 mb-4">Be the first to create and share a new filter with the community.</p>
         </div>
       )}
 
       <div className="space-y-10">
-        {categories.map(category => {
-          const categoryFilters = filters.filter(f => f.category === category);
-          if (categoryFilters.length === 0) {
-            return null;
-          }
-          return (
-            <section key={category}>
-              <h3 className="text-2xl font-bold text-white mb-4 border-b-2 border-base-200 pb-2">{category}</h3>
-              <div className="columns-1 sm:columns-2 lg:columns-3 xl:columns-4 gap-4 md:gap-6">
-                {categoryFilters.map((filter, index) => (
-                  <FilterCard
-                    key={filter.id}
-                    filter={filter}
-                    onSelect={() => setViewState({ view: 'apply', filter })}
-                    aspectRatio={ASPECT_RATIOS[index % ASPECT_RATIOS.length]}
-                  />
-                ))}
-              </div>
+        {trendingSection.filters.length > 0 && (
+            <section>
+                <h3 className="text-2xl font-bold text-content-100 dark:text-dark-content-100 mb-4 border-b-2 border-base-300 dark:border-dark-border-color pb-2">{trendingSection.name}</h3>
+                <div className="columns-1 sm:columns-2 lg:columns-3 xl:columns-4 gap-4 md:gap-6">
+                    {trendingSection.filters.map((filter, index) => (
+                        <FilterCard
+                            key={filter.id}
+                            filter={filter}
+                            onSelect={() => onSelectFilter(filter)}
+                            aspectRatio={ASPECT_RATIOS[index % ASPECT_RATIOS.length]}
+                            user={user}
+                            onDelete={onDeleteFilter}
+                            onEdit={onEditFilter}
+                        />
+                    ))}
+                </div>
             </section>
-          );
+        )}
+        {otherSections.map(categorySection => {
+            if (categorySection.filters.length === 0) return null;
+            return (
+                <section key={categorySection.name}>
+                    <h3 className="text-2xl font-bold text-content-100 dark:text-dark-content-100 mb-4 border-b-2 border-base-300 dark:border-dark-border-color pb-2">{categorySection.name}</h3>
+                    <div className="columns-1 sm:columns-2 lg:columns-3 xl:columns-4 gap-4 md:gap-6">
+                        {categorySection.filters.map((filter, index) => (
+                            <FilterCard
+                                key={filter.id}
+                                filter={filter}
+                                onSelect={() => onSelectFilter(filter)}
+                                aspectRatio={ASPECT_RATIOS[index % ASPECT_RATIOS.length]}
+                                user={user}
+                                onDelete={onDeleteFilter}
+                                onEdit={onEditFilter}
+                            />
+                        ))}
+                    </div>
+                </section>
+            );
         })}
       </div>
     </div>

@@ -1,18 +1,11 @@
 
 import { Filter, User, Share } from '../types';
 import { parseDataUrl } from '../utils/fileUtils';
+import { firebaseConfig } from '../config';
 
 
-// IMPORTANT: Replace with your Firebase project's configuration.
-// Make sure to add your `storageBucket` for the sharing feature.
-const firebaseConfig = {
-  apiKey: "AIzaSyC3VR98pOpdsYZBlkBCsB8fvUwpvOPlJ1g",
-  authDomain: "database-8982a.firebaseapp.com",
-  projectId: "database-8982a",
-  storageBucket: "database-8982a.appspot.com",
-};
-
-const API_KEY = firebaseConfig.apiKey;
+// IMPORTANT: Configuration is now imported from the central config.ts file.
+const API_KEY = process.env.API_KEY;
 const PROJECT_ID = firebaseConfig.projectId;
 const STORAGE_BUCKET = firebaseConfig.storageBucket;
 const FIRESTORE_BASE_URL = `https://firestore.googleapis.com/v1/projects/${PROJECT_ID}/databases/(default)/documents`;
@@ -31,8 +24,12 @@ const transformFirestoreDocToFilter = (doc: any): Filter => {
         prompt: fields.prompt?.stringValue || '',
         previewImageUrl: fields.previewImageUrl?.stringValue || '',
         category: fields.category?.stringValue || 'Useful',
+        type: fields.type?.stringValue === 'merge' ? 'merge' : 'single',
         userId: fields.userId?.stringValue,
         username: fields.username?.stringValue,
+        accessCount: fields.accessCount ? parseInt(fields.accessCount.integerValue, 10) : 0,
+        // FIX: Read the createdAt timestamp from the Firestore document.
+        createdAt: fields.createdAt?.timestampValue,
     };
 };
 
@@ -47,15 +44,35 @@ const transformFilterToFirestoreDoc = (filterData: Omit<Filter, 'id'>) => {
         createdAt: { timestampValue: new Date().toISOString() },
     };
 
+    if (filterData.type) {
+        fields.type = { stringValue: filterData.type };
+    }
     if (filterData.userId) {
         fields.userId = { stringValue: filterData.userId };
     }
     if (filterData.username) {
         fields.username = { stringValue: filterData.username };
     }
+    if (filterData.accessCount !== undefined) {
+        fields.accessCount = { integerValue: filterData.accessCount.toString() };
+    }
 
     return { fields };
 };
+
+// Helper to transform partial filter data into Firestore's REST API format for updates
+const transformFilterToFirestoreFields = (filterData: Partial<Omit<Filter, 'id'>>) => {
+    const fields: any = {};
+    if (filterData.name !== undefined) fields.name = { stringValue: filterData.name };
+    if (filterData.description !== undefined) fields.description = { stringValue: filterData.description };
+    if (filterData.prompt !== undefined) fields.prompt = { stringValue: filterData.prompt };
+    if (filterData.previewImageUrl !== undefined) fields.previewImageUrl = { stringValue: filterData.previewImageUrl };
+    if (filterData.category !== undefined) fields.category = { stringValue: filterData.category };
+    if (filterData.type !== undefined) fields.type = { stringValue: filterData.type };
+    // We don't update createdAt, userId, username, or accessCount during an edit.
+    return { fields };
+};
+
 
 // Helper to transform our Share data into Firestore's REST API format for saving
 const transformShareToFirestoreDoc = (shareData: Omit<Share, 'id'>) => {
@@ -88,27 +105,42 @@ const transformFirestoreDocToShare = (doc: any): Share => {
 };
 
 /**
- * Fetches all filters from the Firestore database using the REST API.
- * @returns A promise that resolves to an array of filters.
+ * Fetches all filters from the Firestore database using the REST API,
+ * handling pagination to ensure all documents are retrieved.
+ * @returns A promise that resolves to an array of all filters.
  */
 export const getFilters = async (): Promise<Filter[]> => {
-    const url = `${FIRESTORE_BASE_URL}/filters?key=${API_KEY}&orderBy=createdAt desc`;
-    
+    let allFilters: Filter[] = [];
+    let pageToken: string | undefined = undefined;
+    const baseUrl = `${FIRESTORE_BASE_URL}/filters?key=${API_KEY}&orderBy=createdAt desc`;
+
     try {
-        const response = await fetch(url);
-        const data = await response.json();
+        do {
+            let url = baseUrl;
+            if (pageToken) {
+                // Append the pageToken to fetch the next page of results
+                url += `&pageToken=${pageToken}`;
+            }
 
-        if (!response.ok) {
-            const errorMsg = data.error?.message || 'Failed to fetch data from Firestore.';
-            throw new Error(errorMsg);
-        }
+            const response = await fetch(url);
+            const data = await response.json();
 
-        if (!data.documents) {
-            return []; // No filters found
-        }
-        
-        const filters = data.documents.map(transformFirestoreDocToFilter);
-        return filters;
+            if (!response.ok) {
+                const errorMsg = data.error?.message || 'Failed to fetch data from Firestore.';
+                throw new Error(errorMsg);
+            }
+
+            if (data.documents && data.documents.length > 0) {
+                const filtersFromPage = data.documents.map(transformFirestoreDocToFilter);
+                allFilters = allFilters.concat(filtersFromPage);
+            }
+
+            // Get the token for the next page, if it exists
+            pageToken = data.nextPageToken;
+
+        } while (pageToken); // Continue fetching as long as there's a next page
+
+        return allFilters;
 
     } catch (error) {
         console.error("Firestore REST API fetch error:", error);
@@ -122,12 +154,13 @@ export const getFilters = async (): Promise<Filter[]> => {
     }
 };
 
+
 /**
  * Saves a new filter to the Firestore database using the REST API.
  */
 export const saveFilter = async (filterData: Omit<Filter, 'id'>): Promise<Filter> => {
     const url = `${FIRESTORE_BASE_URL}/filters?key=${API_KEY}`;
-    const payload = transformFilterToFirestoreDoc(filterData);
+    const payload = transformFilterToFirestoreDoc({...filterData, accessCount: 0});
 
     try {
         const response = await fetch(url, {
@@ -153,6 +186,125 @@ export const saveFilter = async (filterData: Omit<Filter, 'id'>): Promise<Filter
         throw new Error("An unknown error occurred while saving the filter.");
     }
 };
+
+/**
+ * Updates an existing filter in the Firestore database using the REST API.
+ * Requires an auth token.
+ */
+export const updateFilter = async (filterId: string, filterData: Partial<Omit<Filter, 'id'>>, idToken: string): Promise<Filter> => {
+    // We need to specify which fields to update using updateMask.
+    // Firestore REST API requires field paths in the query string.
+    const updateMaskParams = Object.keys(filterData)
+        .map(key => `updateMask.fieldPaths=${key}`)
+        .join('&');
+
+    const url = `${FIRESTORE_BASE_URL}/filters/${filterId}?key=${API_KEY}&${updateMaskParams}`;
+    
+    const payload = transformFilterToFirestoreFields(filterData);
+
+    try {
+        const response = await fetch(url, {
+            method: 'PATCH',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${idToken}`,
+            },
+            body: JSON.stringify(payload),
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+            const errorMsg = data.error?.message || 'Failed to update filter in Firestore.';
+             if (errorMsg.includes('PERMISSION_DENIED')) {
+                 throw new Error('Permission Denied. You might not have the rights to edit this filter. Ensure Firestore rules are set up correctly for authenticated updates.');
+            }
+            throw new Error(errorMsg);
+        }
+        
+        return transformFirestoreDocToFilter(data);
+
+    } catch (error) {
+        console.error("Firestore REST API update error:", error);
+         if (error instanceof Error) {
+            throw new Error(`Could not update the filter. Please try again. Details: ${error.message}`);
+        }
+        throw new Error("An unknown error occurred while updating the filter.");
+    }
+};
+
+/**
+ * Deletes a filter from the Firestore database using the REST API.
+ * Requires an auth token.
+ */
+export const deleteFilter = async (filterId: string, idToken: string): Promise<void> => {
+    const url = `${FIRESTORE_BASE_URL}/filters/${filterId}?key=${API_KEY}`;
+
+    try {
+        const response = await fetch(url, {
+            method: 'DELETE',
+            headers: {
+                'Authorization': `Bearer ${idToken}`,
+            },
+        });
+
+        if (!response.ok) {
+            const data = await response.json();
+            const errorMsg = data.error?.message || 'Failed to delete filter from Firestore.';
+            if (errorMsg.includes('PERMISSION_DENIED')) {
+                 throw new Error('Permission Denied. You might not have the rights to delete this filter. Ensure Firestore rules are set up correctly for authenticated deletes.');
+            }
+            throw new Error(errorMsg);
+        }
+        
+    } catch (error) {
+        console.error("Firestore REST API delete error:", error);
+         if (error instanceof Error) {
+            throw new Error(`Could not delete the filter. Please try again. Details: ${error.message}`);
+        }
+        throw new Error("An unknown error occurred while deleting the filter.");
+    }
+};
+
+/**
+ * Atomically increments the accessCount of a filter.
+ * This is a non-critical background task; errors are logged but not thrown.
+ */
+export const incrementFilterAccessCount = async (filterId: string): Promise<void> => {
+    const url = `${FIRESTORE_BASE_URL}:commit?key=${API_KEY}`;
+    const payload = {
+        writes: [
+            {
+                transform: {
+                    document: `projects/${PROJECT_ID}/databases/(default)/documents/filters/${filterId}`,
+                    fieldTransforms: [
+                        {
+                            fieldPath: 'accessCount',
+                            increment: { integerValue: '1' },
+                        },
+                    ],
+                },
+            },
+        ],
+    };
+
+    try {
+        const response = await fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
+        });
+        if (!response.ok) {
+            const data = await response.json();
+            const errorMsg = data.error?.message || 'Failed to increment access count.';
+            // Log the error but don't disrupt the user experience
+            console.warn(`Could not update access count for filter ${filterId}: ${errorMsg}`);
+        }
+    } catch (error) {
+        console.error("Firestore increment error:", error);
+    }
+};
+
 
 /**
  * Uploads a base64 image string to Firebase Storage.

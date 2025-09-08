@@ -16,7 +16,7 @@ export const shareImage = async (
   user: User | null
 ): Promise<'shared' | 'copied'> => {
   const appUrl = window.location.origin;
-  const shareText = `Check out this image I created with the '${filter.name}' filter on Gemini Filter Fusion! Create your own here: ${appUrl}`;
+  const shareText = `Check out this image I created with the '${filter.name}' filter on Genie! Create your own here: ${appUrl}`;
   const filename = `filtered-${filter.name.toLowerCase().replace(/\s/g, '-')}.png`;
   
   // Try native file sharing first (for mobile)

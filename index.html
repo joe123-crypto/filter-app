@@ -2,22 +2,33 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg width='64' height='64' viewBox='0 0 64 64' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M49.6364 13.1111C49.6364 13.1111 39.0909 21.5556 34.1818 31.3333C29.2727 41.1111 34.1818 48.4444 40.5455 50.6667C46.9091 52.8889 55.2727 50.6667 59.2727 46.2222C55.2727 48.4444 48.9091 47.3333 46.9091 42.8889C44.9091 38.4444 46.9091 34.8889 49.6364 32.4444C49.6364 24 57.2727 21.5556 61.4545 20.4444C57.2727 19.3333 51.6364 16.6667 49.6364 13.1111Z' fill='%234A80C2'/%3E%3Cpath d='M4.54545 44.2222C4.54545 44.2222 15.0909 38 23.4545 40.2222C31.8182 42.4444 33.8182 50.6667 29.8182 55.1111C25.8182 59.5556 16.2727 60.6667 10.9091 58.4444C13.2727 59.5556 19.6364 58.4444 22.2727 54C24.9091 49.5556 22.2727 46.2222 18.2727 44.2222C14.2727 42.2222 7.90909 42.2222 4.54545 44.2222Z' fill='%234A80C2'/%3E%3Cpath d='M2.18182 54C2.18182 54 12.7273 47.7778 21.0909 50C29.4545 52.2222 31.4545 60.4444 27.4545 64H6.90909C6.90909 64 4.54545 61.7778 2.18182 54Z' fill='%234A80C2'/%3E%3C/svg%3E%0A" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Gemini Filter Fusion</title>
+    <title>Genie</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
       tailwind.config = {
+        darkMode: 'class',
         theme: {
           extend: {
             colors: {
-              'brand-primary': '#4f46e5',
-              'brand-secondary': '#7c3aed',
-              'base-100': '#1f2937',
-              'base-200': '#374151',
-              'base-300': '#4b5563',
-              'content-100': '#d1d5db',
-              'content-200': '#9ca3af',
+              'brand-primary': '#4A80C2',
+              'brand-secondary': '#3E6A9E',
+              'base-100': '#FBF9F7',
+              'base-200': '#FFFFFF',
+              'base-300': '#F0F0F0',
+              'content-100': '#2c3e50',
+              'content-200': '#7f8c8d',
+              'border-color': '#EAEAEA',
+              // Dark Theme Colors
+              'dark-brand-primary': '#5D9CEC',
+              'dark-brand-secondary': '#4A80C2',
+              'dark-base-100': '#1a202c',
+              'dark-base-200': '#2d3748',
+              'dark-base-300': '#4a5568',
+              'dark-content-100': '#edf2f7',
+              'dark-content-200': '#a0aec0',
+              'dark-border-color': '#4a5568',
             }
           }
         }
@@ -32,15 +43,12 @@
     "react-dom/client": "https://aistudiocdn.com/react-dom@^19.1.1/client",
     "react-dom/": "https://aistudiocdn.com/react-dom@^19.1.1/",
     "react/": "https://aistudiocdn.com/react@^19.1.1/",
-    "zod": "https://aistudiocdn.com/zod@^4.1.5",
-    "ai/": "https://aistudiocdn.com/ai@^5.0.30/",
-    "ai": "https://aistudiocdn.com/ai@^5.0.30",
-    "@ai-sdk/google": "https://aistudiocdn.com/@ai-sdk/google@^2.0.11"
+    "@google/genai": "https://aistudiocdn.com/@google/genai@^1.17.0"
   }
 }
 </script>
 </head>
-  <body class="bg-base-100 text-content-100">
+  <body class="bg-base-100 dark:bg-dark-base-100 text-content-100 dark:text-dark-content-100">
     <div id="root"></div>
     <script type="module" src="/index.tsx"></script>
   </body>
